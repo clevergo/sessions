@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/clevergo/context"
 	"github.com/clevergo/sessions"
 	"github.com/valyala/fasthttp"
 )
@@ -9,6 +10,7 @@ import (
 var store = sessions.NewCookieStore([]byte("something-very-secret"))
 
 func MyHandler(ctx *fasthttp.RequestCtx) {
+	defer context.Clear(ctx)
 	// Get session from store
 	session, _ := store.Get(ctx, "GOSESSION")
 	// Save session.
