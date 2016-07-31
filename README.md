@@ -1,5 +1,4 @@
 # sessions package for Go(go programing language) fasthttp
-========
 [![GoDoc](https://godoc.org/github.com/clevergo/sessions?status.svg)](https://godoc.org/github.com/clevergo/sessions) [![Build Status](https://travis-ci.org/clevergo/sessions.png?branch=master)](https://travis-ci.org/clevergo/sessions)
 
 **This repo fork from [gorilla/sessions](https://github.com/gorilla/sessions)**
@@ -23,23 +22,48 @@ The key features are:
 Let's start with an example that shows the sessions API in a nutshell:
 
 ```go
-	import (
-		"net/http"
-		"github.com/gorilla/sessions"
-	)
+package main
 
-	var store = sessions.NewCookieStore([]byte("something-very-secret"))
+import (
+	"fmt"
+	"github.com/clevergo/sessions"
+	"github.com/valyala/fasthttp"
+)
 
-	func MyHandler(w http.ResponseWriter, r *http.Request) {
-		// Get a session. We're ignoring the error resulted from decoding an
-		// existing session: Get() always returns a session, even if empty.
-		session, _ := store.Get(r, "session-name")
-		// Set some session values.
-		session.Values["foo"] = "bar"
-		session.Values[42] = 43
-		// Save it before we write to the response/return from the handler.
-		session.Save(r, w)
+var store = sessions.NewCookieStore([]byte("something-very-secret"))
+
+func MyHandler(ctx *fasthttp.RequestCtx) {
+	defer context.Clear(ctx)
+	
+	// Get session from store
+	session, _ := store.Get(ctx, "GOSESSION")
+	// Save session.
+	defer session.Save(ctx)
+
+	if string(ctx.Path()) == "/set" {
+		name := string(ctx.FormValue("name"))
+		if len(name) > 0 {
+			session.Values["name"] = name
+			ctx.SetBodyString(fmt.Sprintf("name has been set as: %s\n", session.Values["name"]))
+		} else {
+			ctx.SetBodyString("No name specified.")
+		}
+		return
 	}
+
+	if name, ok := session.Values["name"]; ok {
+		ctx.SetBodyString(fmt.Sprintf("name: %s\n", name))
+		return
+	}
+
+	ctx.SetBodyString(`
+	You should navigate to http://127.0.0.1:8080/set?name=yourname to set specified name.
+	`)
+}
+
+func main() {
+	fasthttp.ListenAndServe(":8080", MyHandler)
+}
 ```
 
 First we initialize a session store calling `NewCookieStore()` and passing a
@@ -48,33 +72,9 @@ secret key used to authenticate the session. Inside the handler, we call
 session values in session.Values, which is a `map[interface{}]interface{}`.
 And finally we call `session.Save()` to save the session in the response.
 
-Important Note: If you aren't using gorilla/mux, you need to wrap your handlers
-with
-[`context.ClearHandler`](http://www.gorillatoolkit.org/pkg/context#ClearHandler)
-as or else you will leak memory! An easy way to do this is to wrap the top-level
-mux when calling http.ListenAndServe:
+See also [examples](examples)
 
-More examples are available [on the Gorilla
-website](http://www.gorillatoolkit.org/pkg/sessions).
-
-## Store Implementations
-
-Other implementations of the `sessions.Store` interface:
-
-* [github.com/starJammer/gorilla-sessions-arangodb](https://github.com/starJammer/gorilla-sessions-arangodb) - ArangoDB
-* [github.com/yosssi/boltstore](https://github.com/yosssi/boltstore) - Bolt
-* [github.com/srinathgs/couchbasestore](https://github.com/srinathgs/couchbasestore) - Couchbase
-* [github.com/denizeren/dynamostore](https://github.com/denizeren/dynamostore) - Dynamodb on AWS
-* [github.com/bradleypeabody/gorilla-sessions-memcache](https://github.com/bradleypeabody/gorilla-sessions-memcache) - Memcache
-* [github.com/hnakamur/gaesessions](https://github.com/hnakamur/gaesessions) - Memcache on GAE
-* [github.com/kidstuff/mongostore](https://github.com/kidstuff/mongostore) - MongoDB
-* [github.com/srinathgs/mysqlstore](https://github.com/srinathgs/mysqlstore) - MySQL
-* [github.com/antonlindstrom/pgstore](https://github.com/antonlindstrom/pgstore) - PostgreSQL
-* [github.com/boj/redistore](https://github.com/boj/redistore) - Redis
-* [github.com/boj/rethinkstore](https://github.com/boj/rethinkstore) - RethinkDB
-* [github.com/boj/riakstore](https://github.com/boj/riakstore) - Riak
-* [github.com/michaeljs1990/sqlitestore](https://github.com/michaeljs1990/sqlitestore) - SQLite
-* [github.com/wader/gormstore](https://github.com/wader/gormstore) - GORM (MySQL, PostgreSQL, SQLite)
+Important Note:  you need to **context.Clear(ctx)** as or else you will leak memory!
 
 ## License
 
