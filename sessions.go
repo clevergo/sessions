@@ -11,19 +11,10 @@ import (
 
 	"github.com/clevergo/context"
 	"github.com/valyala/fasthttp"
-	"sync"
 )
 
 // Default flashes key.
 const flashesKey = "_flash"
-
-var sessionPool = &sync.Pool{
-	New: func() interface{} {
-		return &Session{
-			Values: make(map[interface{}]interface{}),
-		}
-	},
-}
 
 // Options --------------------------------------------------------------------
 
@@ -45,12 +36,6 @@ type Options struct {
 
 // NewSession is called by session stores to create a new session instance.
 func NewSession(store Store, name string) *Session {
-	if session, ok := sessionPool.Get().(*Session); ok {
-		session.name = name
-		session.store = store
-		return session
-	}
-
 	return &Session{
 		Values: make(map[interface{}]interface{}),
 		store:  store,
@@ -109,7 +94,6 @@ func (s *Session) AddFlash(value interface{}, vars ...string) {
 // store.Save(request, response, session). You should call Save before writing to
 // the response or returning from the handler.
 func (s *Session) Save(ctx *fasthttp.RequestCtx) error {
-	defer sessionPool.Put(s)
 	return s.store.Save(ctx, s)
 }
 
