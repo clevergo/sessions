@@ -77,7 +77,7 @@ See also [examples](examples)
 Important Note:  you need to **context.Clear(ctx)** as or else you will leak memory!
 
 ## Other Stores
-- [Redis Store](https://github.com/clevergo/sessions-store-redis)
+- [Redis Store](https://github.com/clevergo/sessions/stores/redis)
 
 ## License
 
