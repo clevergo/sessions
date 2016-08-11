@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"github.com/clevergo/context"
 	"github.com/clevergo/sessions"
+	"github.com/clevergo/sessions/stores/redisstore"
 	"github.com/valyala/fasthttp"
 )
 
-var store = sessions.NewCookieStore([]byte("something-very-secret"))
+var (
+	store sessions.Store
+)
 
 func MyHandler(ctx *fasthttp.RequestCtx) {
 	defer context.Clear(ctx)
@@ -38,5 +41,11 @@ func MyHandler(ctx *fasthttp.RequestCtx) {
 }
 
 func main() {
+	var err error
+	store, err = redisstore.NewRediStore(10, "tcp", ":6379", "", []byte("secret-key"))
+	if err != nil {
+		panic(err)
+	}
+	// store = sessions.NewCookieStore([]byte("something-very-secret"))
 	fasthttp.ListenAndServe(":8080", MyHandler)
 }
