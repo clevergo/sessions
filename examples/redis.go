@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/clevergo/context"
 	"github.com/clevergo/sessions"
-	"github.com/clevergo/sessions/stores/redis"
+	"github.com/clevergo/sessions/stores/redisstore"
 	"github.com/valyala/fasthttp"
 )
 
