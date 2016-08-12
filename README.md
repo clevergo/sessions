@@ -1,5 +1,7 @@
-# sessions package for Go(go programing language) fasthttp
+# Sessions package for Go(go programing language) fasthttp
 [![GoDoc](https://godoc.org/github.com/clevergo/sessions?status.svg)](https://godoc.org/github.com/clevergo/sessions) [![Build Status](https://travis-ci.org/clevergo/sessions.png?branch=master)](https://travis-ci.org/clevergo/sessions)
+
+### Please do not use this package, it contains a serious bugs, I will fixed it this week.
 
 **This repo fork from [gorilla/sessions](https://github.com/gorilla/sessions)**
 
