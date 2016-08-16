@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file.
 
-package redisstore
+package sessions
 
 import (
 	"bytes"
@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/clevergo/securecookie"
-	"github.com/clevergo/sessions"
 	"github.com/garyburd/redigo/redis"
 	"github.com/valyala/fasthttp"
 )
@@ -25,15 +24,15 @@ var sessionExpire = 86400 * 30
 
 // SessionSerializer provides an interface hook for alternative serializers
 type SessionSerializer interface {
-	Deserialize(d []byte, ss *sessions.Session) error
-	Serialize(ss *sessions.Session) ([]byte, error)
+	Deserialize(d []byte, ss *Session) error
+	Serialize(ss *Session) ([]byte, error)
 }
 
 // JSONSerializer encode the session map to JSON.
 type JSONSerializer struct{}
 
 // Serialize to JSON. Will err if there are unmarshalable key values
-func (s JSONSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
+func (s JSONSerializer) Serialize(ss *Session) ([]byte, error) {
 	m := make(map[string]interface{}, len(ss.Values))
 	for k, v := range ss.Values {
 		ks, ok := k.(string)
@@ -48,7 +47,7 @@ func (s JSONSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
 }
 
 // Deserialize back to map[string]interface{}
-func (s JSONSerializer) Deserialize(d []byte, ss *sessions.Session) error {
+func (s JSONSerializer) Deserialize(d []byte, ss *Session) error {
 	m := make(map[string]interface{})
 	err := json.Unmarshal(d, &m)
 	if err != nil {
@@ -65,7 +64,7 @@ func (s JSONSerializer) Deserialize(d []byte, ss *sessions.Session) error {
 type GobSerializer struct{}
 
 // Serialize using gob
-func (s GobSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
+func (s GobSerializer) Serialize(ss *Session) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	err := enc.Encode(ss.Values)
@@ -76,7 +75,7 @@ func (s GobSerializer) Serialize(ss *sessions.Session) ([]byte, error) {
 }
 
 // Deserialize back to map[interface{}]interface{}
-func (s GobSerializer) Deserialize(d []byte, ss *sessions.Session) error {
+func (s GobSerializer) Deserialize(d []byte, ss *Session) error {
 	dec := gob.NewDecoder(bytes.NewBuffer(d))
 	return dec.Decode(&ss.Values)
 }
@@ -85,8 +84,8 @@ func (s GobSerializer) Deserialize(d []byte, ss *sessions.Session) error {
 type RediStore struct {
 	Pool          *redis.Pool
 	Codecs        []securecookie.Codec
-	Options       *sessions.Options // default configuration
-	DefaultMaxAge int               // default Redis TTL for a MaxAge == 0 session
+	Options       *Options // default configuration
+	DefaultMaxAge int      // default Redis TTL for a MaxAge == 0 session
 	maxLength     int
 	keyPrefix     string
 	serializer    SessionSerializer
@@ -201,7 +200,7 @@ func NewRediStoreWithPool(pool *redis.Pool, keyPairs ...[]byte) (*RediStore, err
 		// http://godoc.org/github.com/garyburd/redigo/redis#Pool
 		Pool:   pool,
 		Codecs: securecookie.CodecsFromPairs(keyPairs...),
-		Options: &sessions.Options{
+		Options: &Options{
 			Path:   "/",
 			MaxAge: sessionExpire,
 		},
@@ -220,18 +219,9 @@ func (s *RediStore) Close() error {
 }
 
 // Get returns a session for the given name after adding it to the registry.
-//
-// See gorilla/sessions FilesystemStore.Get().
-func (s *RediStore) Get(ctx *fasthttp.RequestCtx, name string) (*sessions.Session, error) {
-	return sessions.GetRegistry(ctx).Get(s, name)
-}
-
-// New returns a session for the given name without adding it to the registry.
-//
-// See gorilla/sessions FilesystemStore.New().
-func (s *RediStore) New(ctx *fasthttp.RequestCtx, name string) (*sessions.Session, error) {
+func (s *RediStore) Get(ctx *fasthttp.RequestCtx, name string) (*Session, error) {
 	var err error
-	session := sessions.NewSession(s, name)
+	session := NewSession(s, name)
 	// make a copy
 	options := *s.Options
 	session.Options = &options
@@ -247,13 +237,13 @@ func (s *RediStore) New(ctx *fasthttp.RequestCtx, name string) (*sessions.Sessio
 }
 
 // Save adds a single session to the response.
-func (s *RediStore) Save(ctx *fasthttp.RequestCtx, session *sessions.Session) error {
+func (s *RediStore) Save(ctx *fasthttp.RequestCtx, session *Session) error {
 	// Marked for deletion.
 	if session.Options.MaxAge < 0 {
 		if err := s.delete(session); err != nil {
 			return err
 		}
-		ctx.Response.Header.SetCookie(sessions.NewCookie(session.Name(), "", session.Options))
+		ctx.Response.Header.SetCookie(NewCookie(session.Name(), "", session.Options))
 	} else {
 		// Build an alphanumeric key for the redis store.
 		if session.ID == "" {
@@ -266,7 +256,7 @@ func (s *RediStore) Save(ctx *fasthttp.RequestCtx, session *sessions.Session) er
 		if err != nil {
 			return err
 		}
-		ctx.Response.Header.SetCookie(sessions.NewCookie(session.Name(), encoded, session.Options))
+		ctx.Response.Header.SetCookie(NewCookie(session.Name(), encoded, session.Options))
 	}
 	return nil
 }
@@ -275,7 +265,7 @@ func (s *RediStore) Save(ctx *fasthttp.RequestCtx, session *sessions.Session) er
 //
 // WARNING: This method should be considered deprecated since it is not exposed via the gorilla/sessions interface.
 // Set session.Options.MaxAge = -1 and call Save instead. - July 18th, 2013
-func (s *RediStore) Delete(ctx *fasthttp.RequestCtx, session *sessions.Session) error {
+func (s *RediStore) Delete(ctx *fasthttp.RequestCtx, session *Session) error {
 	conn := s.Pool.Get()
 	defer conn.Close()
 	if _, err := conn.Do("DEL", s.keyPrefix+session.ID); err != nil {
@@ -284,7 +274,7 @@ func (s *RediStore) Delete(ctx *fasthttp.RequestCtx, session *sessions.Session) 
 	// Set cookie to expire.
 	options := *session.Options
 	options.MaxAge = -1
-	ctx.Response.Header.SetCookie(sessions.NewCookie(session.Name(), "", &options))
+	ctx.Response.Header.SetCookie(NewCookie(session.Name(), "", &options))
 	// Clear session values.
 	for k := range session.Values {
 		delete(session.Values, k)
@@ -304,7 +294,7 @@ func (s *RediStore) ping() (bool, error) {
 }
 
 // save stores the session in redis.
-func (s *RediStore) save(session *sessions.Session) error {
+func (s *RediStore) save(session *Session) error {
 	b, err := s.serializer.Serialize(session)
 	if err != nil {
 		return err
@@ -327,7 +317,7 @@ func (s *RediStore) save(session *sessions.Session) error {
 
 // load reads the session from redis.
 // returns true if there is a sessoin data in DB
-func (s *RediStore) load(session *sessions.Session) (bool, error) {
+func (s *RediStore) load(session *Session) (bool, error) {
 	conn := s.Pool.Get()
 	defer conn.Close()
 	if err := conn.Err(); err != nil {
@@ -348,7 +338,7 @@ func (s *RediStore) load(session *sessions.Session) (bool, error) {
 }
 
 // delete removes keys from redis if MaxAge<0
-func (s *RediStore) delete(session *sessions.Session) error {
+func (s *RediStore) delete(session *Session) error {
 	conn := s.Pool.Get()
 	defer conn.Close()
 	if _, err := conn.Do("DEL", s.keyPrefix+session.ID); err != nil {

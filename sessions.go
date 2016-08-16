@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/clevergo/context"
 	"github.com/valyala/fasthttp"
 )
 
@@ -107,86 +106,10 @@ func (s *Session) Store() Store {
 	return s.store
 }
 
-// Registry -------------------------------------------------------------------
-
-// sessionInfo stores a session tracked by the registry.
-type sessionInfo struct {
-	s *Session
-	e error
-}
-
-// contextKey is the type used to store the registry in the context.
-type contextKey int
-
-// registryKey is the key used to store the registry in the context.
-const registryKey contextKey = 0
-
-// GetRegistry returns a registry instance for the current request.
-func GetRegistry(ctx *fasthttp.RequestCtx) *Registry {
-	registry := context.Get(ctx, registryKey)
-	if registry != nil {
-		return registry.(*Registry)
-	}
-	newRegistry := &Registry{
-		ctx:      ctx,
-		sessions: make(map[string]sessionInfo),
-	}
-	context.Set(ctx, registryKey, newRegistry)
-	return newRegistry
-}
-
-// Registry stores sessions used during a request.
-type Registry struct {
-	ctx      *fasthttp.RequestCtx
-	sessions map[string]sessionInfo
-}
-
-// Get registers and returns a session for the given name and session store.
-//
-// It returns a new session if there are no sessions registered for the name.
-func (s *Registry) Get(store Store, name string) (session *Session, err error) {
-	if !isCookieNameValid(name) {
-		return nil, fmt.Errorf("sessions: invalid character in cookie name: %s", name)
-	}
-	if info, ok := s.sessions[name]; ok {
-		session, err = info.s, info.e
-	} else {
-		session, err = store.New(s.ctx, name)
-		session.name = name
-		s.sessions[name] = sessionInfo{s: session, e: err}
-	}
-	session.store = store
-	return
-}
-
-// Save saves all sessions registered for the current request.
-func (s *Registry) Save(ctx *fasthttp.RequestCtx) error {
-	var errMulti MultiError
-	for name, info := range s.sessions {
-		session := info.s
-		if session.store == nil {
-			errMulti = append(errMulti, fmt.Errorf(
-				"sessions: missing store for session %q", name))
-		} else if err := session.store.Save(s.ctx, session); err != nil {
-			errMulti = append(errMulti, fmt.Errorf(
-				"sessions: error saving session %q -- %v", name, err))
-		}
-	}
-	if errMulti != nil {
-		return errMulti
-	}
-	return nil
-}
-
 // Helpers --------------------------------------------------------------------
 
 func init() {
 	gob.Register([]interface{}{})
-}
-
-// Save saves all sessions used during the current request.
-func Save(ctx *fasthttp.RequestCtx) error {
-	return GetRegistry(ctx).Save(ctx)
 }
 
 // NewCookie returns an http.Cookie with the options set. It also sets

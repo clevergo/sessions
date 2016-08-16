@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/clevergo/context"
 	"github.com/clevergo/sessions"
-	"github.com/clevergo/sessions/stores/redisstore"
 	"github.com/valyala/fasthttp"
 )
 
@@ -13,7 +11,6 @@ var (
 )
 
 func MyHandler(ctx *fasthttp.RequestCtx) {
-	defer context.Clear(ctx)
 	// Get session from store
 	session, _ := store.Get(ctx, "GOSESSION")
 	// Save session.
@@ -42,7 +39,7 @@ func MyHandler(ctx *fasthttp.RequestCtx) {
 
 func main() {
 	var err error
-	store, err = redisstore.NewRediStore(10, "tcp", ":6379", "", []byte("secret-key"))
+	store, err = sessions.NewRediStore(10, "tcp", ":6379", "", []byte("secret-key"))
 	if err != nil {
 		panic(err)
 	}
