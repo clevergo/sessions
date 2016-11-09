@@ -1,4 +1,12 @@
 # Sessions package for Go(go programing language) fasthttp
+
+## Important
+**This package has been moved to [https://github.com/go-gem/sessions](https://github.com/go-gem/sessions)**.
+This project is no longer maintained, it is recommend to use [Gem Sessions](https://github.com/go-gem/sessions) package.
+The Gem sessions package has been tested and it's API is same of Gorilla Sessions.
+
+**Sorry for any inconvenience.**
+
 [![GoDoc](https://godoc.org/github.com/clevergo/sessions?status.svg)](https://godoc.org/github.com/clevergo/sessions) [![Build Status](https://travis-ci.org/clevergo/sessions.png?branch=master)](https://travis-ci.org/clevergo/sessions).
 
 **This repo fork from [gorilla/sessions](https://github.com/gorilla/sessions)**.
